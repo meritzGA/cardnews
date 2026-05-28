@@ -1,22 +1,12 @@
-# 민감 데이터 (개인정보)
-*.xlsx
-*.xls
-PRIZE_SUM_OUT_*.xlsx
-PRIZE_6_BRIDGE_OUT_*.xlsx
-MC_LIST_OUT_*.xlsx
-2605_매니저.xlsx
-agencies.json
-
 # 캐시
 _cache/
 *.parquet
 __pycache__/
 *.pyc
 
-# 생성된 카드 (개인정보)
+# 생성된 카드 (실시간 생성하므로 미포함)
 cards/
 cards_v2/
-*.png
 preview_*.png
 preview_*.pdf
 
@@ -28,10 +18,10 @@ _temp_*
 _gen.log
 *.html.tmp
 
-# 카카오톡 스크린샷
+# 카카오톡 스크린샷 (참고용, 미포함)
 KakaoTalk_*.png
 
-# 시책 이미지 (저작권)
+# 시책 이미지 (저작권, 미포함)
 2605_4/
 
 # Streamlit
@@ -45,4 +35,10 @@ KakaoTalk_*.png
 # OS
 .DS_Store
 Thumbs.db
-~$*
+~$*.xlsx
+
+# 참고: 다음은 git에 포함됩니다 (매일 업데이트)
+# - PRIZE_SUM_OUT_*.xlsx
+# - PRIZE_6_BRIDGE_OUT_*.xlsx
+# - MC_LIST_OUT_*.xlsx
+# - 2605_매니저.xlsx
