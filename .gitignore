@@ -1,0 +1,48 @@
+# 민감 데이터 (개인정보)
+*.xlsx
+*.xls
+PRIZE_SUM_OUT_*.xlsx
+PRIZE_6_BRIDGE_OUT_*.xlsx
+MC_LIST_OUT_*.xlsx
+2605_매니저.xlsx
+agencies.json
+
+# 캐시
+_cache/
+*.parquet
+__pycache__/
+*.pyc
+
+# 생성된 카드 (개인정보)
+cards/
+cards_v2/
+*.png
+preview_*.png
+preview_*.pdf
+
+# 임시 파일
+_batch_tmp/
+_tmp_*
+_t_*
+_temp_*
+_gen.log
+*.html.tmp
+
+# 카카오톡 스크린샷
+KakaoTalk_*.png
+
+# 시책 이미지 (저작권)
+2605_4/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+~$*

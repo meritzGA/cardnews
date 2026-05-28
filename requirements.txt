@@ -1,0 +1,12 @@
+# Streamlit 앱
+streamlit>=1.40
+
+# 데이터
+pandas>=2.0
+openpyxl>=3.1
+pyarrow>=14
+
+# 이미지/PDF 렌더
+Pillow>=10
+playwright>=1.40        # Windows/Mac/Linux 모두 지원 (권장)
+# weasyprint>=60        # Linux용 (GTK3 필요)
