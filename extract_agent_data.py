@@ -13,11 +13,30 @@ else:
 CACHE_DIR = DATA_DIR / "_cache"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
+def _find_latest(prefix):
+    """날짜 suffix 가진 엑셀 중 가장 최신 파일"""
+    files = sorted(DATA_DIR.glob(f"{prefix}*.xlsx"), reverse=True)
+    return files[0] if files else (DATA_DIR / f"{prefix}NOT_FOUND.xlsx")
+
+
 FILES = {
-    'PRIZE_SUM': DATA_DIR / "PRIZE_SUM_OUT_20260528.xlsx",
-    'BRIDGE': DATA_DIR / "PRIZE_6_BRIDGE_OUT_20260528.xlsx",
-    'MC': DATA_DIR / "MC_LIST_OUT_20260528.xlsx",
+    'PRIZE_SUM': _find_latest("PRIZE_SUM_OUT_"),
+    'BRIDGE': _find_latest("PRIZE_6_BRIDGE_OUT_"),
+    'MC': _find_latest("MC_LIST_OUT_"),
 }
+
+def get_data_date():
+    """데이터 파일의 기준일 (파일명의 YYYYMMDD - 1일).
+    파일명: PRIZE_SUM_OUT_20260529.xlsx → 기준일 2026-05-28
+    """
+    from datetime import datetime, timedelta
+    fname = FILES['PRIZE_SUM'].name
+    m = re.search(r'(\d{8})\.xlsx', fname)
+    if not m:
+        return datetime.now() - timedelta(days=1)
+    file_date = datetime.strptime(m.group(1), '%Y%m%d')
+    return file_date - timedelta(days=1)
+
 
 
 def _dec(s):
@@ -28,9 +47,17 @@ def _dec(s):
 
 def _load(name):
     parquet_path = CACHE_DIR / f"{name}.parquet"
-    if parquet_path.exists():
+    excel_path = FILES[name]
+    # 캐시가 엑셀보다 오래되면 무효화 (새 데이터 자동 반영)
+    if parquet_path.exists() and excel_path.exists():
+        if parquet_path.stat().st_mtime < excel_path.stat().st_mtime:
+            try: parquet_path.unlink()
+            except: pass
+        else:
+            return pd.read_parquet(parquet_path)
+    elif parquet_path.exists():
         return pd.read_parquet(parquet_path)
-    df = pd.read_excel(FILES[name])
+    df = pd.read_excel(excel_path)
     df.columns = [_dec(c) for c in df.columns]
     for c in df.select_dtypes(include='object').columns:
         df[c] = df[c].map(lambda x: _dec(x) if isinstance(x, str) else x)

@@ -1,7 +1,7 @@
 """메리츠화재 카드뉴스 v16 — 토스 스타일 (콘텐츠 압축)"""
 import sys
 sys.path.insert(0, '/sessions/charming-fervent-newton/mnt/outputs')
-from extract_agent_data import find_agent, get_agent_data, build_card_context
+from extract_agent_data import get_data_date, find_agent, get_agent_data, build_card_context
 from scheme_engine import find_scheme_for_agency, calculate_scheme_rewards
 from datetime import datetime
 import random
@@ -14,11 +14,25 @@ QUOTES = [
     ("한 걸음이 가장 멀리 가는 길.", "노자"),
     ("작은 노력이 성공을 만들어요.", "로버트 콜리어"),
     ("준비된 사람에게 행운이 와요.", "세네카"),
+    ("할 수 있다 믿으면 절반은 이룬 것.", "시어도어 루즈벨트"),
+    ("성공의 비결은 시작입니다.", "마크 트웨인"),
+    ("꿈을 좇는 사람만 잡을 수 있어요.", "헨리 포드"),
+    ("오늘의 노력이 내일의 결과예요.", "콘라드 힐튼"),
+    ("포기하지 않는 자가 결국 이겨요.", "윈스턴 처칠"),
+    ("끈기는 재능을 이깁니다.", "에디슨"),
+    ("기회는 어려움 한가운데 있어요.", "아인슈타인"),
+    ("오늘 흘린 땀은 내일의 보석.", "이소룡"),
+    ("성공은 작은 노력의 합이에요.", "로버트 콜리어"),
+    ("도전하는 자에게 기회가 와요.", "마윈"),
+    ("실패는 성공의 어머니예요.", "토머스 에디슨"),
+    ("천재는 1% 영감과 99% 노력.", "에디슨"),
+    ("운명은 도전하는 자에게 미소.", "버질"),
+    ("작은 시작이 큰 성공으로.", "탈무드"),
 ]
 
 
 CARD_CSS = """
-@page { size: 1080px 3000px; margin: 0; }
+@page { size: 1080px 1500px; margin: 0; }
 * { margin:0; padding:0; box-sizing:border-box; }
 html, body {
   font-family: 'NanumSquare', 'NanumGothic', 'Malgun Gothic', '맑은 고딕', 'Apple SD Gothic Neo', sans-serif;
@@ -27,7 +41,7 @@ html, body {
   width: 1080px;
   margin: 0;
 }
-.wrap { width: 1080px; padding: 24px 24px; background: #f2f4f6; }
+.wrap { width: 1080px; padding: 24px 24px; background: #f2f4f6; page-break-after: always; break-after: page; }
 
 /* 브랜드 바 */
 .brand-bar {
@@ -62,8 +76,7 @@ html, body {
   border-radius: 22px;
   padding: 26px 28px;
   color: #fff;
-  box-shadow: 0 6px 22px rgba(51,61,75,0.18);
-}
+  }
 .amount-card .label { font-size: 32px; color: rgba(255,255,255,0.92); font-weight: 800; margin-bottom: 14px; line-height: 1.25; }
 .amount-card .amount {
   font-size: 78px; font-weight: 900;
@@ -78,8 +91,7 @@ html, body {
   border-radius: 22px;
   padding: 26px 28px;
   color: #fff;
-  box-shadow: 0 6px 22px rgba(214,22,46,0.2);
-}
+  }
 .opp-card .opp-label { font-size: 32px; color: rgba(255,255,255,0.88); font-weight: 800; margin-bottom: 14px; line-height: 1.25; }
 .opp-card .opp-amount {
   font-size: 78px; font-weight: 900;
@@ -91,7 +103,7 @@ html, body {
 
 /* 가로 전체 폭 강조 액션 박스 */
 .action-banner {
-  background: linear-gradient(135deg, #fff8db 0%, #ffe080 100%);
+  background: #ffe9a1;
   border: 5px solid #d4961c;
   border-radius: 22px;
   padding: 32px 28px;
@@ -245,7 +257,7 @@ def build_html(ctx, scheme_rewards=None, base_date=None):
     branch = ctx['branch'] or ''
     manager = ctx['manager'] or ''
     cont_months = ctx.get('continuous_months')
-    base_date = base_date or datetime(2026, 5, 27)
+    base_date = base_date or get_data_date()
     date_str = base_date.strftime('%m/%d 기준')
 
     confirmed_items = _consolidate_items(ctx['confirmed_items'])
@@ -254,10 +266,12 @@ def build_html(ctx, scheme_rewards=None, base_date=None):
     total_potential = 0
     action_banner_text = ''
     if scheme_rewards:
-        total_potential = sum(r['delta_reward'] for r in scheme_rewards if r['delta_reward'] > 0)
-        best = max(scheme_rewards, key=lambda r: r['delta_reward'], default=None)
-        if best and best['delta_reward'] > 0:
-            action_banner_text = f'<span class="hl">{_manwon(best["next_short"])}</span> 더하면 <span class="plus">+{_manwon(best["delta_reward"])}</span>'
+        active = [r for r in scheme_rewards if r['delta_reward'] > 0]
+        total_potential = sum(r['delta_reward'] for r in active)
+        # 두 시상이 같은 실적을 공유하므로 max 부족액만 채우면 둘 다 충족
+        max_short = max((r['next_short'] for r in active), default=0)
+        if total_potential > 0:
+            action_banner_text = f'<span class="hl">{_manwon(max_short)}</span> 더하면 <span class="plus">+{_manwon(total_potential)}</span>'
 
     # 세부 내역 (2열 그리드) — ①②③ 번호 추가
     NUM = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩']
