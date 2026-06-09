@@ -212,19 +212,41 @@ def build_card_context(data):
                 # (지난 주차 시책으로 추가 실적 독려는 의미가 없으므로)
                 from datetime import datetime
                 today = datetime.now()
+                cur_month = today.month
                 day = today.day
                 if day <= 7: active_week = 1
                 elif day <= 14: active_week = 2
                 elif day <= 21: active_week = 3
                 else: active_week = 4
 
+                # 시기 지난 누적 시책 제외 룰
+                # - CONT_5_6 (연속가동 추가): 5월 4주(5/22~31) + 6월 1주(6/1~7)만 유효
+                #   → 6월 2주차+에는 미적용 (데이터에서도 빠짐)
+                # - BRIDGE_5_6 (연속가동): 5월 3~4주(5/15~31) + 6월 1~2주(6/1~14)만 유효
+                #   → 6월 3주차+에는 미적용
+                def is_expired(code: str) -> bool:
+                    if cur_month > 6:
+                        return code in ('CONT_5_6', 'BRIDGE_5_6')
+                    if cur_month == 6:
+                        if code == 'CONT_5_6' and day > 7:    # 6/8부터 제외
+                            return True
+                        if code == 'BRIDGE_5_6' and day > 14:  # 6/15부터 제외
+                            return True
+                    return False
+
+                # 부족 실적 필터: 20만 → 50만으로 완화.
+                # 누적 시책(연속가동 등)은 next_short가 30~40만 단위까지 가능
+                NEXT_SHORT_MAX = 500000  # 50만
+
                 results = calculate_scheme_rewards(scheme, data)
                 for r in results:
                     if r['next_short'] <= 0 or r['delta_reward'] <= 0:
                         continue
-                    if r['next_short'] > 200000:
+                    if r['next_short'] > NEXT_SHORT_MAX:
                         continue
                     if r['week'] is not None and r['week'] != active_week:
+                        continue
+                    if is_expired(r['code']):
                         continue
                     next_round_items.append({
                         'label': r['label'],
@@ -285,9 +307,4 @@ def build_card_context(data):
 
 if __name__ == '__main__':
     import json
-    matches = find_agent('이길범', '3-4')
-    if matches:
-        cid = matches[0]['본인고객ID']
-        data = get_agent_data(cid)
-        ctx = build_card_context(data)
-        print(json.dumps(ctx, ensure_ascii=False, indent=2, default=str))
+    matches = find_agent('�
