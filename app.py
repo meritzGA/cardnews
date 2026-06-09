@@ -14,7 +14,19 @@ from scheme_engine import find_scheme_for_agency, calculate_scheme_rewards
 
 st.set_page_config(page_title="메리츠 시상안내 발송", page_icon="🎁", layout="wide")
 
-CARDS_DIR = Path(__file__).resolve().parent / "cards_v2"
+# ver1 = 월요일용 (지난주 결과 + 격려), ver2 = 화~금용 (부족분 독려)
+# 기본값: 월요일이면 ver1, 그 외 ver2
+_today = datetime.now().weekday()  # 0=월, 1=화, ..., 6=일
+DEFAULT_VERSION = 'ver1' if _today == 0 else 'ver2'
+
+BASE_CARDS_DIR = Path(__file__).resolve().parent / "cards_v2"
+
+def get_cards_dir(version: str) -> Path:
+    """버전 폴더가 있으면 ver1/ver2, 없으면 cards_v2/ 직접 사용 (하위 호환)"""
+    ver_dir = BASE_CARDS_DIR / version
+    if ver_dir.exists() and any(ver_dir.glob('*.png')):
+        return ver_dir
+    return BASE_CARDS_DIR
 
 st.markdown("""
 <style>
@@ -35,7 +47,29 @@ c1, c2 = st.columns([3, 1])
 with c1:
     st.markdown('<div class="brand">메리츠 시상안내 카드뉴스 발송</div>', unsafe_allow_html=True)
 with c2:
-    st.markdown(f"<div style='text-align:right; color:#8b95a1; padding-top:14px;'>{datetime.now().strftime('%Y.%m.%d')}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='text-align:right; color:#8b95a1; padding-top:14px;'>{datetime.now().strftime('%Y.%m.%d')} ({['월','화','수','목','금','토','일'][_today]})</div>", unsafe_allow_html=True)
+
+# 버전 선택 (월요일=ver1 자동, 그 외=ver2 자동)
+vc1, vc2 = st.columns([4, 1])
+with vc1:
+    version_label = st.radio(
+        "발송 모드",
+        options=['ver1', 'ver2'],
+        index=0 if DEFAULT_VERSION == 'ver1' else 1,
+        format_func=lambda v: {
+            'ver1': '📅 ver1 — 월요일용 (지난주 결과 + 격려)',
+            'ver2': '🔥 ver2 — 화~금용 (부족 실적 독려)',
+        }[v],
+        horizontal=True,
+        key='card_version',
+    )
+with vc2:
+    auto_hint = "오늘 추천: " + ("ver1" if _today == 0 else "ver2")
+    st.markdown(f"<div style='padding-top:34px; color:#8b95a1; font-size:13px; text-align:right;'>{auto_hint}</div>", unsafe_allow_html=True)
+
+CARDS_DIR = get_cards_dir(version_label)
+if not (BASE_CARDS_DIR / version_label).exists():
+    st.warning(f"⚠️ `{version_label}` 폴더 미존재 → 임시로 `cards_v2/` 직접 사용. `python gen_parallel.py 4 {version_label}` 실행 필요")
 st.markdown("---")
 
 
@@ -62,8 +96,8 @@ def manwon(v):
     return f"{v//10000:,}만원" if v % 10000 == 0 else f"{round(v/10000):,}만원"
 
 
-def build_kakao_message(cid, name, branch):
-    """카톡 발송용 메시지 텍스트 생성"""
+def build_kakao_message(cid, name, branch, version='ver2'):
+    """카톡 발송용 메시지 텍스트 생성 (ver1=격려, ver2=독려)"""
     data = get_agent_data(cid)
     if not data.get('PRIZE_SUM'):
         return ''
@@ -80,16 +114,47 @@ def build_kakao_message(cid, name, branch):
     mgr_info = contacts.get(mgr_name, {})
     phone = mgr_info.get('phone', '')
 
-    lines = [
-        f"[{name} 팀장님 시상안내]",
-        "",
-        f"5월 확정 시상금: {manwon(confirmed)}",
-    ]
-    if total_pot > 0:
-        lines.append(f"5~6월 추가 가능: +{manwon(total_pot)}")
-        if best and best['delta_reward'] > 0:
-            lines.append("")
-            lines.append(f"※ {manwon(best['next_short'])} 더하시면 +{manwon(best['delta_reward'])} 추가!")
+    # 데이터 기준 월
+    from extract_agent_data import get_data_date
+    base_date = get_data_date()
+    cur_month = base_date.month
+
+    if version == 'ver1':
+        # 월요일 - 지난주 결과 + 격려
+        if confirmed >= 1000000:
+            cheer = "멋진 1주차 성과예요! 🎉"
+        elif confirmed >= 300000:
+            cheer = "1주차 수고하셨어요!"
+        elif confirmed > 0:
+            cheer = "1주차 첫 발걸음 응원합니다!"
+        else:
+            cheer = "이번 주부터 함께 시작해봐요!"
+
+        lines = [
+            f"[{name} 팀장님] {cur_month}월 1주차 결과 안내",
+            "",
+            cheer,
+            "",
+            f"1주차 확정 시상금: {manwon(confirmed)}",
+        ]
+        if total_pot > 0:
+            lines.append(f"2주차 도전시 +{manwon(total_pot)} 추가 가능")
+        lines.append("")
+        lines.append("이번 주(2주차)도 함께 달려봐요!")
+    else:
+        # 화~금 - 부족분 독려
+        lines = [
+            f"[{name} 팀장님 시상안내]",
+            "",
+            f"현재 확정 시상금: {manwon(confirmed)}",
+        ]
+        if total_pot > 0:
+            grand = confirmed + total_pot
+            lines.append(f"이번 주 추가 가능: +{manwon(total_pot)} (총 {manwon(grand)})")
+            if best and best['delta_reward'] > 0:
+                lines.append("")
+                lines.append(f"※ {manwon(best['next_short'])} 더하시면 +{manwon(best['delta_reward'])} 추가!")
+
     lines.append("")
     lines.append(f"담당 매니저 - {mgr_name}")
     if phone:
@@ -257,9 +322,9 @@ if st.session_state.get('selected_card'):
                 </div>
                 """, unsafe_allow_html=True)
 
-            # 카톡 발송용 메시지
-            st.markdown("<div style='margin-top:18px; font-weight:800; color:#191f28; font-size:15px;'>💬 카톡 발송용 메시지</div>", unsafe_allow_html=True)
-            msg = build_kakao_message(cid, name, branch)
+            # 카톡 발송용 메시지 (현재 선택된 버전에 맞게)
+            st.markdown(f"<div style='margin-top:18px; font-weight:800; color:#191f28; font-size:15px;'>💬 카톡 발송용 메시지 ({version_label})</div>", unsafe_allow_html=True)
+            msg = build_kakao_message(cid, name, branch, version=version_label)
             st.code(msg, language='text')
             st.markdown("""
             <div style='font-size:12px; color:#6b7684; padding-top:4px;'>
